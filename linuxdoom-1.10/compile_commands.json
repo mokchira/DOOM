@@ -1,0 +1,17 @@
+[
+    {
+        "arguments": [
+            "gcc",
+            "-c",
+            "-g",
+            "-Wall",
+            "-DNORMALUNIX",
+            "-DLINUX",
+            "-o",
+            "linux/m_misc.o",
+            "m_misc.c"
+        ],
+        "directory": "/home/michaelb/dev/DOOM/linuxdoom-1.10",
+        "file": "m_misc.c"
+    }
+]
