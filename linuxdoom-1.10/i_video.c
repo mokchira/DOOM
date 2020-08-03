@@ -66,7 +66,9 @@ Visual*		X_visual;
 GC		X_gc;
 XEvent		X_event;
 int		X_screen;
-XVisualInfo	X_visualinfo;
+static XVisualInfo*	X_visualinfo;
+static char* windowName = "floating"; // what I use to make the window floating on i3
+static XTextProperty xWindowName;
 XImage*		image;
 int		X_width;
 int		X_height;
@@ -545,8 +547,9 @@ void UploadNewPalette(Colormap cmap, byte *palette)
 #ifdef __cplusplus
     if (X_visualinfo.c_class == PseudoColor && X_visualinfo.depth == 8)
 #else
-    if (X_visualinfo.class == PseudoColor && X_visualinfo.depth == 8)
+    if (X_visualinfo->class == PseudoColor && X_visualinfo->depth == 8)
 #endif
+    //TODO: we need to adjust this 
 	{
 	    // initialize the colormap
 	    if (firstcall)
@@ -769,9 +772,16 @@ void I_InitGraphics(void)
     // use the default visual 
     X_screen = DefaultScreen(X_display);
     //if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo))
-    if (!XMatchVisualInfo(X_display, X_screen, 8, PseudoColor, &X_visualinfo))
-	I_Error("xdoom currently only supports 256-color PseudoColor screens");
-    X_visual = X_visualinfo.visual;
+	//I_Error("xdoom currently only supports 256-color PseudoColor screens");
+
+    // myown thing to get a visual working
+    //
+    XVisualInfo template;
+    int numVisuals;
+    template.visualid = XVisualIDFromVisual(XDefaultVisual(X_display, X_screen));
+    X_visualinfo = XGetVisualInfo(X_display, VisualIDMask, &template, &numVisuals);
+
+    X_visual = X_visualinfo->visual;
 
     // check for the MITSHM extension
     doShm = XShmQueryExtension(X_display);
@@ -791,9 +801,9 @@ void I_InitGraphics(void)
 
     fprintf(stderr, "Using MITSHM extension\n");
 
-    // create the colormap
+    // create the colormap M: changed AllocAll to AllocNone
     X_cmap = XCreateColormap(X_display, RootWindow(X_display,
-						   X_screen), X_visual, AllocAll);
+						   X_screen), X_visual, AllocNone);
 
     // setup attributes for main window
     attribmask = CWEventMask | CWColormap | CWBorderPixel;
@@ -812,7 +822,7 @@ void I_InitGraphics(void)
 					x, y,
 					X_width, X_height,
 					0, // borderwidth
-					8, // depth
+					X_visualinfo->depth, // depth
 					InputOutput,
 					X_visual,
 					attribmask,
@@ -828,6 +838,10 @@ void I_InitGraphics(void)
   			X_mainWindow,
   			valuemask,
   			&xgcvalues );
+    
+    // M: set the window name
+    XStringListToTextProperty(&windowName, 1, &xWindowName);
+    XSetWMName(X_display, X_mainWindow, &xWindowName);
 
     // map the window
     XMapWindow(X_display, X_mainWindow);
@@ -854,12 +868,13 @@ void I_InitGraphics(void)
     if (doShm)
     {
 
+    printf("M: doShm is True\n");
 	X_shmeventtype = XShmGetEventBase(X_display) + ShmCompletion;
 
 	// create the image
 	image = XShmCreateImage(	X_display,
 					X_visual,
-					8,
+					X_visualinfo->depth,
 					ZPixmap,
 					0,
 					&X_shminfo,
@@ -898,20 +913,26 @@ void I_InitGraphics(void)
     {
 	image = XCreateImage(	X_display,
     				X_visual,
-    				8,
+    				X_visualinfo->depth,
     				ZPixmap,
     				0,
-    				(char*)malloc(X_width * X_height),
+    				(char*)malloc(X_width * X_height * 4),
     				X_width, X_height,
-    				8,
-    				X_width );
+    				32,
+    				X_width * 4);
 
     }
 
     if (multiply == 1)
+    {
 	screens[0] = (unsigned char *) (image->data);
+    printf("M: screens[0] is set to image->data. \n");
+    }
     else
-	screens[0] = (unsigned char *) malloc (SCREENWIDTH * SCREENHEIGHT);
+    {
+	screens[0] = (unsigned char *) malloc (SCREENWIDTH * SCREENHEIGHT * 4);
+    printf("M: screens[0] is set to malloc'd buffer. \n");
+    }
 
 }
 
