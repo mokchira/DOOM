@@ -66,7 +66,7 @@ Visual*		X_visual;
 GC		X_gc;
 XEvent		X_event;
 int		X_screen;
-// M: begin: my additions
+// M: my additions
 typedef unsigned long PIXEL24;
 static XVisualInfo*	X_visualinfo;
 static char* windowName = "floating"; // what I use to make the window floating on i3
@@ -75,7 +75,7 @@ static PIXEL24 st2d_8to24table[256];
 static int shiftmask_fl=0;
 static long r_shift,g_shift,b_shift;
 static unsigned long r_mask,g_mask,b_mask;
-// M: end:   my additions
+// M: my additions end
 XImage*		image;
 int		X_width;
 int		X_height;
