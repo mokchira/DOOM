@@ -66,9 +66,16 @@ Visual*		X_visual;
 GC		X_gc;
 XEvent		X_event;
 int		X_screen;
+// M: begin: my additions
+typedef unsigned long PIXEL24;
 static XVisualInfo*	X_visualinfo;
 static char* windowName = "floating"; // what I use to make the window floating on i3
 static XTextProperty xWindowName;
+static PIXEL24 st2d_8to24table[256];
+static int shiftmask_fl=0;
+static long r_shift,g_shift,b_shift;
+static unsigned long r_mask,g_mask,b_mask;
+// M: end:   my additions
 XImage*		image;
 int		X_width;
 int		X_height;
@@ -348,6 +355,42 @@ void I_UpdateNoBlit (void)
     // what is this?
 }
 
+void st3_fixup( XImage *framebuf, int x, int y, int width, int height)
+{
+	int yi;
+	unsigned char *src;
+	PIXEL24 *dest;
+	register int count, n;
+
+	if( (x<0)||(y<0) )return;
+
+	for (yi = y; yi < (y+height); yi++) {
+		src = &framebuf->data [yi * framebuf->bytes_per_line];
+
+		// Duff's Device
+		count = width;
+		n = (count + 7) / 8;
+		dest = ((PIXEL24 *)src) + x+width - 1;
+		src += x+width - 1;
+
+		switch (count % 8) {
+		case 0:	do {	*dest-- = st2d_8to24table[*src--];
+		case 7:			*dest-- = st2d_8to24table[*src--];
+		case 6:			*dest-- = st2d_8to24table[*src--];
+		case 5:			*dest-- = st2d_8to24table[*src--];
+		case 4:			*dest-- = st2d_8to24table[*src--];
+		case 3:			*dest-- = st2d_8to24table[*src--];
+		case 2:			*dest-- = st2d_8to24table[*src--];
+		case 1:			*dest-- = st2d_8to24table[*src--];
+				} while (--n > 0);
+		}
+
+//		for(xi = (x+width-1); xi >= x; xi--) {
+//			dest[xi] = st2d_8to16table[src[xi]];
+//		}
+	}
+}
+
 //
 // I_FinishUpdate
 //
@@ -485,6 +528,12 @@ void I_FinishUpdate (void)
     if (doShm)
     {
 
+    // M: hope this works
+    st3_fixup( image, 
+        0, 0, X_width,
+        X_height);
+    // M: hope this works
+
 	if (!XShmPutImage(	X_display,
 				X_mainWindow,
 				X_gc,
@@ -537,12 +586,55 @@ void I_ReadScreen (byte* scr)
 //
 static XColor	colors[256];
 
+void shiftmask_init()
+{
+    unsigned int x;
+    r_mask=X_visual->red_mask;
+    g_mask=X_visual->green_mask;
+    b_mask=X_visual->blue_mask;
+    for(r_shift=-8,x=1;x<r_mask;x=x<<1)r_shift++;
+    for(g_shift=-8,x=1;x<g_mask;x=x<<1)g_shift++;
+    for(b_shift=-8,x=1;x<b_mask;x=x<<1)b_shift++;
+    shiftmask_fl=1;
+}
+
+PIXEL24 xlib_rgb24(int r,int g,int b)
+{
+    PIXEL24 p;
+    if(shiftmask_fl==0) shiftmask_init();
+    p=0;
+
+    if(r_shift>0) {
+        p=(r<<(r_shift))&r_mask;
+    } else if(r_shift<0) {
+        p=(r>>(-r_shift))&r_mask;
+    } else p|=(r&r_mask);
+
+    if(g_shift>0) {
+        p|=(g<<(g_shift))&g_mask;
+    } else if(g_shift<0) {
+        p|=(g>>(-g_shift))&g_mask;
+    } else p|=(g&g_mask);
+
+    if(b_shift>0) {
+        p|=(b<<(b_shift))&b_mask;
+    } else if(b_shift<0) {
+        p|=(b>>(-b_shift))&b_mask;
+    } else p|=(b&b_mask);
+
+    return p;
+}
+
 void UploadNewPalette(Colormap cmap, byte *palette)
 {
 
     register int	i;
     register int	c;
     static boolean	firstcall = true;
+
+	for(i=0;i<256;i++) {
+		st2d_8to24table[i]= xlib_rgb24(palette[i*3], palette[i*3+1],palette[i*3+2]);
+	}
 
 #ifdef __cplusplus
     if (X_visualinfo.c_class == PseudoColor && X_visualinfo.depth == 8)
