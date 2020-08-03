@@ -355,7 +355,7 @@ void I_UpdateNoBlit (void)
     // what is this?
 }
 
-void st3_fixup( XImage *framebuf, int x, int y, int width, int height)
+void st3_fixup_old( XImage *framebuf, int x, int y, int width, int height)
 {
 	int yi;
 	unsigned char *src;
@@ -389,6 +389,32 @@ void st3_fixup( XImage *framebuf, int x, int y, int width, int height)
 //			dest[xi] = st2d_8to16table[src[xi]];
 //		}
 	}
+}
+
+void st3_fixup(XImage *image, int width, int height)
+{
+    uint8_t *row_src;
+
+    for (int y = 0; y < height; y++) {
+        row_src = (uint8_t *)&image->data [y * image->bytes_per_line];
+        for (int x = width-1; x >= 0; x--) {
+            XPutPixel(image, x, y, st2d_8to24table[row_src[x]]);
+        }
+    }
+}
+
+void st3_fixup_w_my_scale(XImage *image, int width, int height)
+{
+    uint8_t *row_src;
+
+    printf("Width: %d    Height: %d \n", width, height);
+
+    for (int y = 0; y < height; y++) {
+        row_src = (uint8_t *)&image->data [y * image->bytes_per_line];
+        for (int x = width-1; x >= 0; x--) {
+            XPutPixel(image, x, y, st2d_8to24table[row_src[x]]);
+        }
+    }
 }
 
 //
@@ -529,8 +555,8 @@ void I_FinishUpdate (void)
     {
 
     // M: hope this works
-    st3_fixup( image, 
-        0, 0, X_width,
+    st3_fixup_w_my_scale( image, 
+        X_width,
         X_height);
     // M: hope this works
 
