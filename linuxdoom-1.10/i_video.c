@@ -21,6 +21,7 @@
 //
 //-----------------------------------------------------------------------------
 
+#include <stdio.h>
 static const char
 rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
@@ -412,7 +413,7 @@ void st3_fixup_w_my_scale(XImage *image, int width, int height)
     for (int y = 0; y < height; y++) {
         row_src = (uint8_t *)&image->data [y * image->bytes_per_line];
         for (int x = width-1; x >= 0; x--) {
-            XPutPixel(image, x, y, st2d_8to24table[row_src[x]]);
+            XPutPixel(image, x, y, st2d_8to24table[row_src[x*4]]);
         }
     }
 }
@@ -444,106 +445,164 @@ void I_FinishUpdate (void)
     
     }
 
-    // scales the screen size before blitting it
-    if (multiply == 2)
+    if (multiply == 1)
     {
-	unsigned int *olineptrs[2];
-	unsigned int *ilineptr;
-	int x, y, i;
-	unsigned int twoopixels;
-	unsigned int twomoreopixels;
-	unsigned int fouripixels;
-
-	ilineptr = (unsigned int *) (screens[0]);
-	for (i=0 ; i<2 ; i++)
-	    olineptrs[i] = (unsigned int *) &image->data[i*X_width];
-
-	y = SCREENHEIGHT;
-	while (y--)
-	{
-	    x = SCREENWIDTH;
-	    do
-	    {
-		fouripixels = *ilineptr++;
-		twoopixels =	(fouripixels & 0xff000000)
-		    |	((fouripixels>>8) & 0xffff00)
-		    |	((fouripixels>>16) & 0xff);
-		twomoreopixels =	((fouripixels<<16) & 0xff000000)
-		    |	((fouripixels<<8) & 0xffff00)
-		    |	(fouripixels & 0xff);
-#ifdef __BIG_ENDIAN__
-		*olineptrs[0]++ = twoopixels;
-		*olineptrs[1]++ = twoopixels;
-		*olineptrs[0]++ = twomoreopixels;
-		*olineptrs[1]++ = twomoreopixels;
-#else
-		*olineptrs[0]++ = twomoreopixels;
-		*olineptrs[1]++ = twomoreopixels;
-		*olineptrs[0]++ = twoopixels;
-		*olineptrs[1]++ = twoopixels;
-#endif
-	    } while (x-=4);
-	    olineptrs[0] += X_width/4;
-	    olineptrs[1] += X_width/4;
-	}
-
+        for (int y = 0; y < SCREENHEIGHT; y++) 
+        {
+            for (int x = 0; x < SCREENWIDTH; x++) 
+            {
+                int index = x + y * SCREENWIDTH;
+                XPutPixel(image, x, y, (unsigned long)screens[0][index]);
+//                image->data[index * 4] = screens[0][index];
+//                image->data[index * 4 + 1] = screens[0][index];
+//                image->data[index * 4 + 2] = screens[0][index];
+//                image->data[index * 4 + 3] = screens[0][index];
+            }
+        }
     }
+
+    else if (multiply == 2)
+    {
+        for (int y = 0; y < SCREENHEIGHT; y++) 
+        {
+            for (int x = 0; x < SCREENWIDTH; x++) 
+            {
+                int index = x + y * SCREENWIDTH;
+                XPutPixel(image, x * 2 + 0, y * 2 + 0, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 2 + 1, y * 2 + 0, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 2 + 0, y * 2 + 1, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 2 + 1, y * 2 + 1, (unsigned long)screens[0][index]);
+//                image->data[index * 4] = screens[0][index];
+//                image->data[index * 4 + 1] = screens[0][index];
+//                image->data[index * 4 + 2] = screens[0][index];
+//                image->data[index * 4 + 3] = screens[0][index];
+            }
+        }
+    }
+
     else if (multiply == 3)
     {
-	unsigned int *olineptrs[3];
-	unsigned int *ilineptr;
-	int x, y, i;
-	unsigned int fouropixels[3];
-	unsigned int fouripixels;
-
-	ilineptr = (unsigned int *) (screens[0]);
-	for (i=0 ; i<3 ; i++)
-	    olineptrs[i] = (unsigned int *) &image->data[i*X_width];
-
-	y = SCREENHEIGHT;
-	while (y--)
-	{
-	    x = SCREENWIDTH;
-	    do
-	    {
-		fouripixels = *ilineptr++;
-		fouropixels[0] = (fouripixels & 0xff000000)
-		    |	((fouripixels>>8) & 0xff0000)
-		    |	((fouripixels>>16) & 0xffff);
-		fouropixels[1] = ((fouripixels<<8) & 0xff000000)
-		    |	(fouripixels & 0xffff00)
-		    |	((fouripixels>>8) & 0xff);
-		fouropixels[2] = ((fouripixels<<16) & 0xffff0000)
-		    |	((fouripixels<<8) & 0xff00)
-		    |	(fouripixels & 0xff);
-#ifdef __BIG_ENDIAN__
-		*olineptrs[0]++ = fouropixels[0];
-		*olineptrs[1]++ = fouropixels[0];
-		*olineptrs[2]++ = fouropixels[0];
-		*olineptrs[0]++ = fouropixels[1];
-		*olineptrs[1]++ = fouropixels[1];
-		*olineptrs[2]++ = fouropixels[1];
-		*olineptrs[0]++ = fouropixels[2];
-		*olineptrs[1]++ = fouropixels[2];
-		*olineptrs[2]++ = fouropixels[2];
-#else
-		*olineptrs[0]++ = fouropixels[2];
-		*olineptrs[1]++ = fouropixels[2];
-		*olineptrs[2]++ = fouropixels[2];
-		*olineptrs[0]++ = fouropixels[1];
-		*olineptrs[1]++ = fouropixels[1];
-		*olineptrs[2]++ = fouropixels[1];
-		*olineptrs[0]++ = fouropixels[0];
-		*olineptrs[1]++ = fouropixels[0];
-		*olineptrs[2]++ = fouropixels[0];
-#endif
-	    } while (x-=4);
-	    olineptrs[0] += 2*X_width/4;
-	    olineptrs[1] += 2*X_width/4;
-	    olineptrs[2] += 2*X_width/4;
-	}
-
+        for (int y = 0; y < SCREENHEIGHT; y++) 
+        {
+            for (int x = 0; x < SCREENWIDTH; x++) 
+            {
+                int index = x + y * SCREENWIDTH;
+                XPutPixel(image, x * 3 + 0, y * 3 + 0, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 3 + 1, y * 3 + 0, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 3 + 2, y * 3 + 0, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 3 + 0, y * 3 + 1, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 3 + 1, y * 3 + 1, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 3 + 2, y * 3 + 1, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 3 + 0, y * 3 + 2, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 3 + 1, y * 3 + 2, (unsigned long)screens[0][index]);
+                XPutPixel(image, x * 3 + 2, y * 3 + 2, (unsigned long)screens[0][index]);
+//                image->data[index * 4] = screens[0][index];
+//                image->data[index * 4 + 1] = screens[0][index];
+//                image->data[index * 4 + 2] = screens[0][index];
+//                image->data[index * 4 + 3] = screens[0][index];
+            }
+        }
     }
+    // scales the screen size before blitting it
+//    if (multiply == 2)
+//    {
+//	unsigned int *olineptrs[2];
+//	unsigned int *ilineptr;
+//	int x, y, i;
+//	unsigned int twoopixels;
+//	unsigned int twomoreopixels;
+//	unsigned int fouripixels;
+//
+//	ilineptr = (unsigned int *) (screens[0]);
+//	for (i=0 ; i<2 ; i++)
+//	    olineptrs[i] = (unsigned int *) &image->data[i*X_width];
+//
+//	y = SCREENHEIGHT;
+//	while (y--)
+//	{
+//	    x = SCREENWIDTH;
+//	    do
+//	    {
+//		fouripixels = *ilineptr++;
+//		twoopixels =	(fouripixels & 0xff000000)
+//		    |	((fouripixels>>8) & 0xffff00)
+//		    |	((fouripixels>>16) & 0xff);
+//		twomoreopixels =	((fouripixels<<16) & 0xff000000)
+//		    |	((fouripixels<<8) & 0xffff00)
+//		    |	(fouripixels & 0xff);
+////#ifdef __BIG_ENDIAN__
+////		*olineptrs[0]++ = twoopixels;
+////		*olineptrs[1]++ = twoopixels;
+////		*olineptrs[0]++ = twomoreopixels;
+////		*olineptrs[1]++ = twomoreopixels;
+////#else
+//		*olineptrs[0]++ = twomoreopixels;
+//		*olineptrs[1]++ = twomoreopixels;
+//		*olineptrs[0]++ = twoopixels;
+//		*olineptrs[1]++ = twoopixels;
+////#endif
+//	    } while (x-=4);
+//	    olineptrs[0] += X_width/4;
+//	    olineptrs[1] += X_width/4;
+//	}
+//
+//    }
+//    else if (multiply == 3)
+//    {
+//	unsigned int *olineptrs[3];
+//	unsigned int *ilineptr;
+//	int x, y, i;
+//	unsigned int fouropixels[3];
+//	unsigned int fouripixels;
+//
+//	ilineptr = (unsigned int *) (screens[0]);
+//	for (i=0 ; i<3 ; i++)
+//	    olineptrs[i] = (unsigned int *) &image->data[i*X_width];
+//
+//	y = SCREENHEIGHT;
+//	while (y--)
+//	{
+//	    x = SCREENWIDTH;
+//	    do
+//	    {
+//		fouripixels = *ilineptr++;
+//		fouropixels[0] = (fouripixels & 0xff000000)
+//		    |	((fouripixels>>8) & 0xff0000)
+//		    |	((fouripixels>>16) & 0xffff);
+//		fouropixels[1] = ((fouripixels<<8) & 0xff000000)
+//		    |	(fouripixels & 0xffff00)
+//		    |	((fouripixels>>8) & 0xff);
+//		fouropixels[2] = ((fouripixels<<16) & 0xffff0000)
+//		    |	((fouripixels<<8) & 0xff00)
+//		    |	(fouripixels & 0xff);
+//#ifdef __BIG_ENDIAN__
+//		*olineptrs[0]++ = fouropixels[0];
+//		*olineptrs[1]++ = fouropixels[0];
+//		*olineptrs[2]++ = fouropixels[0];
+//		*olineptrs[0]++ = fouropixels[1];
+//		*olineptrs[1]++ = fouropixels[1];
+//		*olineptrs[2]++ = fouropixels[1];
+//		*olineptrs[0]++ = fouropixels[2];
+//		*olineptrs[1]++ = fouropixels[2];
+//		*olineptrs[2]++ = fouropixels[2];
+//#else
+//		*olineptrs[0]++ = fouropixels[2];
+//		*olineptrs[1]++ = fouropixels[2];
+//		*olineptrs[2]++ = fouropixels[2];
+//		*olineptrs[0]++ = fouropixels[1];
+//		*olineptrs[1]++ = fouropixels[1];
+//		*olineptrs[2]++ = fouropixels[1];
+//		*olineptrs[0]++ = fouropixels[0];
+//		*olineptrs[1]++ = fouropixels[0];
+//		*olineptrs[2]++ = fouropixels[0];
+//#endif
+//	    } while (x-=4);
+//	    olineptrs[0] += 2*X_width/4;
+//	    olineptrs[1] += 2*X_width/4;
+//	    olineptrs[2] += 2*X_width/4;
+//	}
+
+//    }
     else if (multiply == 4)
     {
 	// Broken. Gotta fix this some day.
@@ -560,6 +619,33 @@ void I_FinishUpdate (void)
         X_height);
     // M: hope this works
 
+    //
+    // M: for debuggin. to see make sure that 
+    static int didit = 0;
+    if (didit == 0)
+    {
+        FILE* scrFile;
+        FILE* imgFile;
+        scrFile = fopen("screen-dump", "w");
+        imgFile = fopen("image-dump", "w");
+        for (int i = 0; i < SCREENHEIGHT; i++) 
+        {
+            fprintf(scrFile, "\n");
+            fprintf(imgFile, "\n");
+            for (int j = 0; j < SCREENWIDTH; j++) 
+            {
+                fprintf(scrFile, " %x ",screens[0][j + i * SCREENWIDTH]); 
+                fprintf(imgFile, " %x ",(unsigned int)XGetPixel(image, j, i));
+            }
+        }
+        fclose(scrFile);
+        fclose(imgFile);
+        didit = 1;
+    }
+
+    // M: for debugging
+    //
+    //
 	if (!XShmPutImage(	X_display,
 				X_mainWindow,
 				X_gc,
@@ -1041,16 +1127,16 @@ void I_InitGraphics(void)
 
     }
 
-    if (multiply == 1)
-    {
-	screens[0] = (unsigned char *) (image->data);
-    printf("M: screens[0] is set to image->data. \n");
-    }
-    else
-    {
-	screens[0] = (unsigned char *) malloc (SCREENWIDTH * SCREENHEIGHT * 4);
+//    if (multiply == 1)
+//    {
+//	screens[0] = (unsigned char *) (image->data);
+//    printf("M: screens[0] is set to image->data. \n");
+//    }
+//    else
+//    {
+	screens[0] = (unsigned char *) malloc (SCREENWIDTH * SCREENHEIGHT);
     printf("M: screens[0] is set to malloc'd buffer. \n");
-    }
+//    }
 
 }
 
